@@ -45,6 +45,9 @@ def _assign_methylation(cpg_pos: list, frac: float = 0.2):
     """
     return [rng.binomialvariate(1, frac) for pos in cpg_pos]
 
+def _simulate_sample(reference, regions, truth, condition):
+    return None
+
 def generate_regions(
         n_synthetic: int = 2,
         n_ontarget: int = 2,
