@@ -43,6 +43,7 @@ def _assign_methylation(cpg_pos: list, frac: float = 0.2):
     :param frac: fraction of CpGs to be assigned methylation (i.e. 1)
     :returns: list of methylation calls (0/1) with length len(cpg_pos)
     """
+    return [rng.binomialvariate(1, frac) for pos in cpg_pos]
 
 def generate_regions(
         n_synthetic: int = 2,
@@ -114,6 +115,15 @@ def write_panel_bed(regions:tuple, output_path:str):
             f.write(f"{ref}\t{start}\t{end}\n")
             i = end
 
+def write_truth_tsv(cpg_pos:list, output_path:str):
+    """Writes ground truth methylation status (0: unmethylated, 1: methylated)
+    to .tsv file
+
+    :param cpg_pos: CpG position from sequence
+    :param output_path: Output file path for .tsv file
+    """
+    with open(output_path, "w") as f:
+        f.write(cpg_pos)
 
 
 if __name__ == "__main__":
@@ -121,3 +131,4 @@ if __name__ == "__main__":
     reference = generate_reference(regions)
     write_fasta(reference[0], "data/synthetic_reference.txt")
     write_panel_bed(regions, "data/synthetic_panel.bed")
+    print(_assign_methylation(reference[1]))
