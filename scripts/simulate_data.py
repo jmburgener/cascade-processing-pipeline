@@ -313,22 +313,29 @@ def create_sample_fastq(
     """
     # Generate on/off-target and synthetic fragments based on label
     fragments = _simulate_sample(regions, label)
-    if label == 'case':
+    if label.upper() == 'CASE':
         c_mfrac = 0.8 * conversion_efficiency
     else:
         c_mfrac = 0.2 * conversion_efficiency    
     fragments_bs = [_bisulfite_convert(frag, mfrac=c_mfrac) for 
                     frag in fragments[0:2]] + \
-                        [_bisulfite_convert(fragments[2], mfrac=conversion_efficiency)]
+                        [_bisulfite_convert(fragments[2], mfrac=1-conversion_efficiency)]
     fragments_bs_lib = [
         _add_umi_adapters(entry, adapter_file) for 
             sublist in fragments_bs for entry in sublist
     ]
-    
+
     return fragments_bs_lib
 
 
 def write_fastq(sample_reads:list, sample_name:str, out_dir:str, read_length:int = 150):
+    '''Writes FASTQ file and simulates read_length
+
+    :param sample_reads: output from _create_sample_fastq
+    :param sample_name: sample name to include in file name
+    :param out_dir: base directory to write fastq/sample.fastq
+    :param read_length: simulated read length of full length fragments
+    '''
     # write fastq directory at out_dir if not present
     fastq_dir = f'{out_dir}/fastq'
     if os.path.exists(fastq_dir) == False:
@@ -337,8 +344,8 @@ def write_fastq(sample_reads:list, sample_name:str, out_dir:str, read_length:int
 
     # generate quality scores in ASCII format for each sequence
     r1_reads, r2_reads = (
-        [r1 for r1, _ in sample_reads][0:read_length], 
-        [r2 for _, r2 in sample_reads][0:read_length]
+        [r1[0:read_length] for r1, _ in sample_reads], 
+        [r2[0:read_length] for _, r2 in sample_reads]
     )
     r1_qual = [_generate_read_qual(read) for read in r1_reads]
     r2_qual = [_generate_read_qual(read) for read in r2_reads]
@@ -364,8 +371,44 @@ def write_fastq(sample_reads:list, sample_name:str, out_dir:str, read_length:int
             i += 1
         file.close()
 
-def write_cohort_fastq_files(sample_sheet:str, out_dir:str):
-    pass
+def write_cohort_fastq_files(
+        regions:tuple, 
+        sample_sheet:str, 
+        adapter_file:str, 
+        out_dir:str
+    ):
+    '''Writes FASTQ files for multiple samples specified by sample_sheet.csv
+
+    :param regions: output from generate_regions() function
+    :param sample_sheet: CSV file with columns 'sample_id', 'condition', and 'conversion_efficiency'
+    :param adatper_file: .txt file with expected adapter sequence in read
+    :param out_dir: base directory for fastq files to be written (<out_dir>/fastq/*.fastq)
+    '''
+    # read in sample_sheet.csv
+    cohort_list = []
+    with open(sample_sheet, 'r') as file:
+        for line in file:
+            row = line.split(',')
+            row = [item.strip() for item in row]
+            if row == ['sample_id','condition','conversion_efficiency']:
+                sample_col = row.index('sample_id')
+                cond_col = row.index('condition')
+                conv_col = row.index('conversion_efficiency')
+                continue
+            sample_id, condition, conversion_efficiency = \
+                str(row[sample_col]), str(row[cond_col]), float(row[conv_col])
+            cohort_list += [(sample_id, condition, conversion_efficiency)]
+    file.close()
+    # write FASTQ files for each sample in the cohort
+    for sample in cohort_list:
+        sample_fastq = create_sample_fastq(
+            regions, 
+            sample[1], 
+            adapter_file,
+            sample[2]
+        )
+        print(f'Writing FASTQ for sample {sample[0]} at {out_dir}\n')
+        write_fastq(sample_fastq, sample[0], out_dir)
 
 if __name__ == "__main__":
     regions = generate_regions()
@@ -377,11 +420,6 @@ if __name__ == "__main__":
         "Illumina_Universal_Adapter"
     )
     write_panel_bed(regions, "data/synthetic_panel.bed")
-    test_case = create_sample_fastq(regions, 'case', 'data/adapter.txt', 0.99)
-    write_fastq(test_case, 'test', 'data')
-    test_case = _simulate_sample(
-        regions,
-        'case'
+    write_cohort_fastq_files(
+        regions, 'data/sample_sheet.csv', 'data/adapter.txt', 'data'
     )
-    test_seq = _bisulfite_convert(test_case[0])
-    _add_umi_adapters(test_seq[0], "data/adapter.txt")
