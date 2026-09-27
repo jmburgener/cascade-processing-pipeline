@@ -1,0 +1,2 @@
+>Illumina_Universal_Adapter
+AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
