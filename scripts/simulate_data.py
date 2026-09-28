@@ -282,16 +282,6 @@ def write_panel_bed(regions:tuple, output_path:str):
             f.write(f"{ref}\t{start}\t{end}\n")
             i = end
 
-def write_truth_tsv(cpg_pos:list, output_path:str):
-    """Writes ground truth methylation status (0: unmethylated, 1: methylated)
-    to .tsv file
-
-    :param cpg_pos: CpG position from sequence
-    :param output_path: Output file path for .tsv file
-    """
-    with open(output_path, "w") as f:
-        f.write(cpg_pos)
-
 def create_sample_fastq(
         regions:tuple, 
         label:str, 
@@ -357,19 +347,22 @@ def write_fastq(sample_reads:list, sample_name:str, out_dir:str, read_length:int
     file_name_out = fastq_dir + f'/{sample_name}'
 
     # read 1
-    with open(f'{file_name_out}_R1_001.fastq', 'w') as file:
+    r1_path = f'{file_name_out}_R1_001.fastq'
+    with open(r1_path, 'w') as file:
         i = 0
         while i < len(read_ids):
             file.write(f'{read_ids[i][0]}\n{r1_reads[i]}\n+\n{r1_qual[i]}\n')
             i += 1
         file.close()
     # read 2
-    with open(f'{file_name_out}_R2_001.fastq', 'w') as file:
+    r2_path = f'{file_name_out}_R2_001.fastq'
+    with open(r2_path, 'w') as file:
         i = 0
         while i < len(read_ids):
             file.write(f'{read_ids[i][1]}\n{r2_reads[i]}\n+\n{r2_qual[i]}\n')
             i += 1
         file.close()
+    return r1_path, r2_path
 
 def write_cohort_fastq_files(
         regions:tuple, 
@@ -400,20 +393,24 @@ def write_cohort_fastq_files(
             cohort_list += [(sample_id, condition, conversion_efficiency)]
     file.close()
     # write FASTQ files for each sample in the cohort
-    for sample in cohort_list:
-        sample_fastq = create_sample_fastq(
-            regions, 
-            sample[1], 
-            adapter_file,
-            sample[2]
-        )
-        print(f'Writing FASTQ for sample {sample[0]} at {out_dir}\n')
-        write_fastq(sample_fastq, sample[0], out_dir)
+    with open('nextflow_sample_sheet.txt', 'w') as file:
+        file.write('sample_id,fastq_1,fastq_2\n')
+        for sample in cohort_list:
+            sample_fastq = create_sample_fastq(
+                regions, 
+                sample[1], 
+                adapter_file,
+                sample[2]
+            )
+            print(f'Writing FASTQ for sample {sample[0]} at {out_dir}\n')
+            sample_r1, sample_r2 = write_fastq(sample_fastq, sample[0], out_dir)
+            file.write(f'{sample[0]},{sample_r1},{sample_r2}\n')
+
 
 if __name__ == "__main__":
     regions = generate_regions()
     reference = generate_reference(regions)
-    write_fasta(reference[0], "data/synthetic_reference.txt")
+    write_fasta(reference[0], "data/synthetic_reference.fa")
     write_fasta(
         "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT",
         "data/adapter.txt",
