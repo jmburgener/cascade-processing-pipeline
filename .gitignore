@@ -1,2 +1,3 @@
 data/Bisulfite_Genome
 work/*
+.nextflow*
