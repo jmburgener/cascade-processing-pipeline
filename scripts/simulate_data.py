@@ -393,8 +393,8 @@ def write_cohort_fastq_files(
             cohort_list += [(sample_id, condition, conversion_efficiency)]
     file.close()
     # write FASTQ files for each sample in the cohort
-    with open('nextflow_sample_sheet.txt', 'w') as file:
-        file.write('sample_id,fastq_1,fastq_2\n')
+    with open(f'{out_dir}/nextflow_sample_sheet.txt', 'w') as file:
+        file.write('sample,fastq_1,fastq_2\n')
         for sample in cohort_list:
             sample_fastq = create_sample_fastq(
                 regions, 

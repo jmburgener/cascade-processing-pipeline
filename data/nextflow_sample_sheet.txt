@@ -1,4 +1,4 @@
-sample_id,fastq_1,fastq_2
+sample,fastq_1,fastq_2
 high_signal_1,data/fastq/high_signal_1_R1_001.fastq,data/fastq/high_signal_1_R2_001.fastq
 high_signal_2,data/fastq/high_signal_2_R1_001.fastq,data/fastq/high_signal_2_R2_001.fastq
 qc_fail,data/fastq/qc_fail_R1_001.fastq,data/fastq/qc_fail_R2_001.fastq
