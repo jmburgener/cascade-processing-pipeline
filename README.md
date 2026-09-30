@@ -11,21 +11,67 @@ runs from the repo with no external data.
 
 ## Workflow
 
+```mermaid
+flowchart TB
+    subgraph pre["1 · Preprocess"]
+        direction LR
+        fastq[/"Paired FASTQ<br/>R1, R2"/] --> umi["extractUMI<br/><i>umi_tools</i>"] --> trim["trimAdapters<br/><i>cutadapt</i>"]
+    end
+
+    subgraph aln["2 · Align + deduplicate"]
+        direction LR
+        ref[/"Reference FASTA"/] --> prep["bismarkGenomePrep<br/><i>Bismark</i>"] --> align["bismarkAlign<br/><i>Bismark</i>"] --> sort["sortBam<br/><i>samtools</i>"] --> dedup["dedupUMI<br/><i>umi_tools</i>"] --> bams[/"bams/*.dedup.bam"/]
+    end
+
+    subgraph meth["3 · Methylation + QC gate"]
+        direction LR
+        nsort["nameSortBam<br/><i>samtools</i>"] --> extract["methylationExtract<br/><i>Bismark</i>"] --> gate{"Spike-in conversion<br/>≥ 95%?"}
+        gate -- fail --> drop["Dropped<br/>with warning"]
+    end
+
+    subgraph out["4 · Summarize (QC pass only)"]
+        direction LR
+        summary["sampleSummary<br/><i>samtools</i>"] --> cohort[/"cohort_summary.tsv"/]
+    end
+
+    subgraph frag["5 · Fragment table (outside this repo)"]
+        direction LR
+        fragtable[/"One row per fragment<br/>per QC-pass sample"/]
+    end
+
+    subgraph dmr["6 · Count matrix + DMR scoring (cascade-dmr)"]
+        direction LR
+        filter["Molecular filter"] --> mid["Midpoint counts<br/>across ROIs"] --> matrix[/"Features × samples<br/>count matrix"/] --> score["DMR calling<br/>+ sample scoring"]
+    end
+
+    pre --> aln --> meth -- pass --> out
+    out -- QC-pass BAMs --> frag --> dmr
+
+    classDef io fill:#eef2f7,stroke:#6b7280;
+    classDef fail fill:#fdecea,stroke:#c0392b,color:#c0392b;
+    classDef ext fill:#ffffff,stroke:#6b7280,stroke-dasharray:5 4;
+    class fastq,ref,cohort,bams io;
+    class drop fail;
+    class fragtable,filter,mid,matrix,score ext;
+    style frag fill:#fafafa,stroke:#6b7280,stroke-dasharray:6 4
+    style dmr fill:#fafafa,stroke:#6b7280,stroke-dasharray:6 4
 ```
-FASTQ (R1/R2)
-  │
-  ├─ extractUMI          umi_tools extract: move the inline UMI into the read name
-  ├─ trimAdapters        cutadapt: 3' adapter (+ UMI), quality trim, length filter
-  ├─ bismarkAlign        Bismark: align to the bisulfite-converted synthetic reference
-  ├─ sortBam             samtools sort + index
-  ├─ dedupUMI            umi_tools dedup: collapse PCR duplicates by position + UMI
-  ├─ nameSortBam         samtools sort -n: mates adjacent for methylation calling
-  ├─ methylationExtract  bismark_methylation_extractor: per-CpG coverage file
-  ├─ conversionQC        conversion efficiency on an unmethylated spike-in
-  │     └─ QC gate       samples below min_conversion (95%) are dropped, with a warning
-  └─ sampleSummary       on-target rate + CpG methylation over the panel
-        └─ cohort_summary.tsv
-```
+
+Stages 1–4 are this repo. The dashed stages run downstream of it: stage 6 is [cascade-dmr](https://github.com/jmburgener/cascade-dmr), which applies the molecular filter, counts fragment midpoints across regions of interest into a features × samples matrix, and calls and scores DMRs.
+
+A one-page PNG of this chart is in [`docs/pipeline-flowchart.png`](docs/pipeline-flowchart.png).
+
+| Step | Tool | What it does |
+|---|---|---|
+| extractUMI | umi_tools extract | Move the inline UMI into the read name |
+| trimAdapters | cutadapt | 3' adapter (+ UMI), quality trim, length filter |
+| bismarkAlign | Bismark | Align to the bisulfite-converted synthetic reference |
+| sortBam | samtools | Coordinate sort + index |
+| dedupUMI | umi_tools dedup | Collapse PCR duplicates by position + UMI |
+| nameSortBam | samtools sort -n | Mates adjacent for methylation calling |
+| methylationExtract | bismark_methylation_extractor | Per-CpG coverage file |
+| conversionQC | awk on the coverage file | Conversion efficiency on an unmethylated spike-in; samples below `min_conversion` (95%) are dropped with a warning |
+| sampleSummary | samtools + awk | On-target rate and CpG methylation over the panel → `cohort_summary.tsv` |
 
 `bismarkGenomePrep` builds the bisulfite-converted index once and shares it across samples.
 
@@ -107,6 +153,7 @@ scripts/main.nf            pipeline
 scripts/simulate_data.py   synthetic data generator
 nextflow.config            Docker on
 data/                      synthetic reference, panel, spike-in, sample sheets, FASTQs
+docs/pipeline-flowchart.png  one-page flowchart (rendered from the Mermaid chart above)
 ```
 
 ## Known limitations
