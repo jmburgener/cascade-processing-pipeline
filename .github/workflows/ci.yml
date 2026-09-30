@@ -1,0 +1,27 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: nf-core/setup-nextflow@v2
+        with:
+          version: "26.04.6"
+
+      - name: Run pipeline on the synthetic cohort
+        run: nextflow run scripts/main.nf
+
+      - name: Check the QC gate
+        run: |
+          cat results/cohort_summary.tsv
+          test "$(tail -n +2 results/cohort_summary.tsv | wc -l)" -eq 5
+          ! grep -q qc_fail results/cohort_summary.tsv
